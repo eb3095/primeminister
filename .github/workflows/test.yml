@@ -29,6 +29,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
+      - name: Prepare development files
+        run: |
+          cp README.md src/
+          cp LICENSE src/
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -56,6 +61,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install build twine setuptools wheel
+
+      - name: Prepare build files
+        run: |
+          cp README.md src/
+          cp LICENSE src/
 
       - name: Build package
         run: make build

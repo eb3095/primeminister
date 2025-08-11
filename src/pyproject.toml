@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "primeminister"
 version = "1.0.0"
 description = "An AI CLI tool that uses a council of AI personalities to provide well-rounded advice"
-readme = "../README.md"
+readme = "README.md"
 authors = [
     {name = "Eric Benner", email = "ebennerit@gmail.com"}
 ]
