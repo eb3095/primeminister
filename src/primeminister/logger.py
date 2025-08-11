@@ -17,8 +17,7 @@ class PrimeMinisterLogger:
     def setup_logging_directory(self) -> None:
         """Setup logging directory based on platform and permissions."""
         # Only use system logs if running as root on Linux
-        if (self.system == "linux" and
-            os.geteuid() == 0):
+        if self.system == "linux" and os.geteuid() == 0:
             system_log_dir = Path("/var/log/primeminister")
             try:
                 system_log_dir.mkdir(parents=True, exist_ok=True)

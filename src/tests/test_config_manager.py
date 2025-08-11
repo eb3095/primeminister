@@ -42,42 +42,51 @@ class TestConfigManager:
 
     def test_init(self, config_manager):
         """Test ConfigManager initialization."""
-        assert hasattr(config_manager, 'is_linux')
-        assert hasattr(config_manager, 'etc_config_path')
+        assert hasattr(config_manager, 'system')
+        assert hasattr(config_manager, 'user_config_path')
+        assert hasattr(config_manager, 'system_config_path')
         assert hasattr(config_manager, 'module_config_path')
-        assert config_manager.etc_config_path == Path('/etc/primeminister/config.json')
+        # System config path is None on non-Linux or Linux path on Linux
+        if config_manager.system == 'linux':
+            assert config_manager.system_config_path == Path('/etc/primeminister/config.json')
+        else:
+            assert config_manager.system_config_path is None
 
     @patch('platform.system')
     def test_init_linux(self, mock_system):
         """Test ConfigManager initialization on Linux."""
         mock_system.return_value = 'Linux'
         cm = ConfigManager()
-        assert cm.is_linux is True
+        assert cm.system == 'linux'
+        assert cm.system_config_path == Path('/etc/primeminister/config.json')
 
     @patch('platform.system')
     def test_init_non_linux(self, mock_system):
         """Test ConfigManager initialization on non-Linux systems."""
         mock_system.return_value = 'Darwin'
         cm = ConfigManager()
-        assert cm.is_linux is False
+        assert cm.system == 'darwin'
+        assert cm.system_config_path is None
 
     @patch('platform.system')
     @patch('pathlib.Path.exists')
-    def test_get_config_path_linux_exists(self, mock_exists, mock_system, config_manager):
-        """Test get_config_path when Linux and /etc config exists."""
+    @patch('os.geteuid')
+    def test_get_config_path_linux_exists(self, mock_geteuid, mock_exists, mock_system, config_manager):
+        """Test get_config_path when Linux, running as root, and system config exists."""
         mock_system.return_value = 'Linux'
+        mock_geteuid.return_value = 0  # Running as root
         mock_exists.return_value = True
         cm = ConfigManager()
 
         result = cm.get_config_path()
-        assert result == cm.etc_config_path
+        assert result == cm.system_config_path
 
     @patch('platform.system')
     @patch('pathlib.Path.exists')
     def test_get_config_path_linux_not_exists(self, mock_exists, mock_system, config_manager):
-        """Test get_config_path when Linux but /etc config doesn't exist."""
+        """Test get_config_path when Linux but user config doesn't exist."""
         mock_system.return_value = 'Linux'
-        mock_exists.return_value = False
+        mock_exists.return_value = False  # Neither user nor system config exists
         cm = ConfigManager()
 
         result = cm.get_config_path()
@@ -96,8 +105,8 @@ class TestConfigManager:
         """Test successful config loading."""
         mock_data = json.dumps(sample_config)
 
-        with patch.object(config_manager, 'get_config_path') as mock_path:
-            mock_path.return_value = Path('/test/config.json')
+        with patch.object(config_manager, 'ensure_config_exists') as mock_ensure:
+            mock_ensure.return_value = Path('/test/config.json')
             with patch('builtins.open', mock_open(read_data=mock_data)):
                 result = config_manager.load_config()
 
@@ -133,35 +142,40 @@ class TestConfigManager:
     @patch('pathlib.Path.exists')
     @patch('pathlib.Path.mkdir')
     @patch('shutil.copy2')
-    def test_ensure_config_exists_linux_success(self, mock_copy, mock_mkdir, mock_exists, mock_system):
-        """Test ensure_config_exists on Linux with successful creation."""
+    @patch('os.geteuid')
+    def test_ensure_config_exists_linux_success(self, mock_geteuid, mock_copy, mock_mkdir, mock_exists, mock_system):
+        """Test ensure_config_exists on Linux as root with successful creation."""
         mock_system.return_value = 'Linux'
-        # First call (etc_config_path.exists()) returns False, second call (module_config_path.exists()) returns True
+        mock_geteuid.return_value = 0  # Running as root
+        # First call (system_config_path.exists()) returns False, second call (module_config_path.exists()) returns True
         mock_exists.side_effect = [False, True]
         cm = ConfigManager()
 
         result = cm.ensure_config_exists()
 
         mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-        mock_copy.assert_called_once_with(cm.module_config_path, cm.etc_config_path)
-        assert result == cm.etc_config_path
+        mock_copy.assert_called_once_with(cm.module_config_path, cm.system_config_path)
+        assert result == cm.system_config_path
 
     @patch('platform.system')
     @patch('pathlib.Path.exists')
     @patch('pathlib.Path.mkdir')
-    def test_ensure_config_exists_linux_permission_error(self, mock_mkdir, mock_exists, mock_system):
-        """Test ensure_config_exists on Linux with permission error."""
+    @patch('shutil.copy2')
+    @patch('os.geteuid')
+    def test_ensure_config_exists_linux_permission_error(self, mock_geteuid, mock_copy, mock_mkdir, mock_exists, mock_system):
+        """Test ensure_config_exists on Linux as root with permission error, falls back to user config."""
         mock_system.return_value = 'Linux'
-        # First call (etc_config_path.exists()) returns False, second call (module_config_path.exists()) returns False
-        mock_exists.side_effect = [False, False]
-        mock_mkdir.side_effect = PermissionError
+        mock_geteuid.return_value = 0  # Running as root
+        # First call (system_config_path.exists()) returns False, then mkdir fails
+        mock_exists.side_effect = [False, False, True]  # system doesn't exist, user doesn't exist, module exists
+        mock_mkdir.side_effect = [PermissionError, None]  # System mkdir fails, user mkdir succeeds
         cm = ConfigManager()
 
-        with patch.object(cm, '_create_default_config') as mock_create:
-            result = cm.ensure_config_exists()
+        result = cm.ensure_config_exists()
 
-        mock_create.assert_called_once_with(cm.module_config_path)
-        assert result == cm.module_config_path
+        # Should fall back to user config
+        assert result == cm.user_config_path
+        mock_copy.assert_called_once_with(cm.module_config_path, cm.user_config_path)
 
     def test_create_default_config(self, config_manager, tmp_path):
         """Test _create_default_config method."""

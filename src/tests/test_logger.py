@@ -3,13 +3,13 @@ Tests for PrimeMinisterLogger functionality.
 """
 import json
 import logging
+import os
 import tempfile
 import pytest
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 from datetime import datetime
 import sys
-import os
 
 # Add src to path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -46,7 +46,7 @@ class TestPrimeMinisterLogger:
 
         with patch.object(PrimeMinisterLogger, 'setup_logging_directory'):
             logger = PrimeMinisterLogger()
-            assert logger.is_linux is True
+            assert logger.system == 'linux'
 
     @patch('platform.system')
     def test_init_non_linux(self, mock_system):
@@ -55,12 +55,14 @@ class TestPrimeMinisterLogger:
 
         with patch.object(PrimeMinisterLogger, 'setup_logging_directory'):
             logger = PrimeMinisterLogger()
-            assert logger.is_linux is False
+            assert logger.system == 'darwin'
 
     @patch('platform.system')
-    def test_setup_logging_directory_linux(self, mock_system):
-        """Test setup_logging_directory on Linux."""
+    @patch('os.geteuid')
+    def test_setup_logging_directory_linux(self, mock_geteuid, mock_system):
+        """Test setup_logging_directory on Linux as root."""
         mock_system.return_value = 'Linux'
+        mock_geteuid.return_value = 0  # Running as root
 
         with patch('pathlib.Path.mkdir') as mock_mkdir:
             logger = PrimeMinisterLogger()
@@ -68,15 +70,17 @@ class TestPrimeMinisterLogger:
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     @patch('platform.system')
-    def test_setup_logging_directory_linux_permission_error(self, mock_system):
-        """Test setup_logging_directory on Linux with permission error."""
+    @patch('os.geteuid')
+    def test_setup_logging_directory_linux_permission_error(self, mock_geteuid, mock_system):
+        """Test setup_logging_directory on Linux as root with permission error."""
         mock_system.return_value = 'Linux'
+        mock_geteuid.return_value = 0  # Running as root
 
-        # Mock mkdir to fail once (for /var/log/primeminister) then succeed (for ./logs)
+        # Mock mkdir to fail once (for /var/log/primeminister) then succeed (for user logs)
         with patch('pathlib.Path.mkdir', side_effect=[PermissionError, None]) as mock_mkdir:
             logger = PrimeMinisterLogger()
-            # Should fallback to ./logs
-            assert logger.log_dir == Path('./logs')
+            # Should fallback to user logs
+            assert logger.log_dir == Path.home() / 'primeminister' / 'logs'
             assert mock_mkdir.call_count == 2  # First attempt + fallback
 
     @patch('platform.system')
@@ -86,7 +90,7 @@ class TestPrimeMinisterLogger:
 
         with patch('pathlib.Path.mkdir') as mock_mkdir:
             logger = PrimeMinisterLogger()
-            assert logger.log_dir == Path('./logs')
+            assert logger.log_dir == Path.home() / 'primeminister' / 'logs'
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     def test_get_current_log_file(self, logger):
