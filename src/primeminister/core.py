@@ -37,31 +37,33 @@ class PrimeMinister:
 
         # Apply mode override if provided
         if mode_override:
-            self.config['mode'] = mode_override
+            self.config["mode"] = mode_override
             self.std_logger.info("Mode overridden to: %s", mode_override)
 
         # Initialize async OpenAI client
         self.client = AsyncOpenAI(
-            api_key=self.config.get('openai_key'),
-            base_url=self.config.get('api_url', 'https://api.openai.com/v1')
+            api_key=self.config.get("openai_key"),
+            base_url=self.config.get("api_url", "https://api.openai.com/v1"),
         )
 
         # Initialize council members
         self.council = self._initialize_council()
 
-        mode = self.config.get('mode', 'council')
-        self.std_logger.info("PrimeMinister initialized with %d council members in %s mode", len(self.council), mode)
+        mode = self.config.get("mode", "council")
+        self.std_logger.info(
+            "PrimeMinister initialized with %d council members in %s mode", len(self.council), mode
+        )
 
     def _initialize_council(self) -> List[CouncilMember]:
         """Initialize council members from configuration."""
         council = []
 
-        for member_config in self.config.get('council', []):
+        for member_config in self.config.get("council", []):
             member = CouncilMember(
-                model=member_config.get('model', self.config.get('model', 'gpt-4')),
-                personality=member_config.get('personality', ''),
-                voter=member_config.get('voter', True),
-                silent=member_config.get('silent', False)
+                model=member_config.get("model", self.config.get("model", "gpt-4")),
+                personality=member_config.get("personality", ""),
+                voter=member_config.get("voter", True),
+                silent=member_config.get("silent", False),
             )
             council.append(member)
 
@@ -69,7 +71,7 @@ class PrimeMinister:
 
     def _build_council_prompt(self, user_prompt: str, member: CouncilMember) -> str:
         """Build the complete prompt for a council member."""
-        base_prompt = self.config.get('universal_council_prompt', '')
+        base_prompt = self.config.get("universal_council_prompt", "")
         user_info = self._get_user_context()
 
         full_prompt = f"""
@@ -90,9 +92,9 @@ Provide your advice based on your unique perspective and expertise.
 
     def _get_user_context(self) -> str:
         """Get user context from configuration."""
-        user_config = self.config.get('user', {})
-        attributes = user_config.get('attributes', [])
-        goal = user_config.get('goal', '')
+        user_config = self.config.get("user", {})
+        attributes = user_config.get("attributes", [])
+        goal = user_config.get("goal", "")
 
         context = f"User attributes: {', '.join(attributes)}\n"
         if goal:
@@ -108,16 +110,20 @@ Provide your advice based on your unique perspective and expertise.
             response = await self.client.chat.completions.create(
                 model=member.model,
                 messages=[{"role": "user", "content": full_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=1000
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=1000,
             )
 
             member.response = response.choices[0].message.content
-            self.std_logger.info("Received response from council member: %s", member.personality[:50])
+            self.std_logger.info(
+                "Received response from council member: %s", member.personality[:50]
+            )
             return member.response
 
         except Exception as e:
-            self.std_logger.error("Error getting response from council member %s: %s", member.personality[:50], str(e))
+            self.std_logger.error(
+                "Error getting response from council member %s: %s", member.personality[:50], str(e)
+            )
             member.response = f"Error: Unable to get response from this council member. ({str(e)})"
             return member.response
 
@@ -145,15 +151,17 @@ Provide your advice based on your unique perspective and expertise.
                 if is_error:
                     error_count += 1
 
-                responses.append({
-                    'uuid': str(uuid.uuid4()),
-                    'personality': member.personality,
-                    'model': member.model,
-                    'response': member.response,
-                    'is_voter': member.is_voter,
-                    'is_silent': member.is_silent,
-                    'has_error': is_error
-                })
+                responses.append(
+                    {
+                        "uuid": str(uuid.uuid4()),
+                        "personality": member.personality,
+                        "model": member.model,
+                        "response": member.response,
+                        "is_voter": member.is_voter,
+                        "is_silent": member.is_silent,
+                        "has_error": is_error,
+                    }
+                )
 
         # Check if too many responses failed
         total_responses = len(responses)
@@ -171,11 +179,17 @@ Provide your advice based on your unique perspective and expertise.
             raise RuntimeError(error_msg)
 
         if error_count > 0:
-            self.std_logger.warning("Some council members failed (%d/%d), but continuing with available responses", error_count, total_responses)
+            self.std_logger.warning(
+                "Some council members failed (%d/%d), but continuing with available responses",
+                error_count,
+                total_responses,
+            )
 
         return responses
 
-    async def conduct_voting(self, responses: List[Dict[str, Any]], user_prompt: str) -> Dict[str, List[str]]:
+    async def conduct_voting(
+        self, responses: List[Dict[str, Any]], user_prompt: str
+    ) -> Dict[str, List[str]]:
         """Conduct blind voting among council members."""
         self.std_logger.info("Conducting voting among council members")
 
@@ -183,10 +197,16 @@ Provide your advice based on your unique perspective and expertise.
         voters = [member for member in self.council if member.is_voter]
 
         # Get response options (non-silent responses without errors)
-        response_options = [resp for resp in responses if not resp.get('is_silent', False) and not resp.get('has_error', False)]
+        response_options = [
+            resp
+            for resp in responses
+            if not resp.get("is_silent", False) and not resp.get("has_error", False)
+        ]
 
         if not response_options:
-            error_msg = "No valid responses available for voting (all responses were silent or had errors)"
+            error_msg = (
+                "No valid responses available for voting (all responses were silent or had errors)"
+            )
             self.std_logger.error(error_msg)
             raise RuntimeError(error_msg)
 
@@ -204,10 +224,17 @@ Provide your advice based on your unique perspective and expertise.
 
         for vote_result in vote_results:
             if vote_result:  # Skip None results from errors
-                chosen_response = next((r for r in response_options if r['uuid'] == vote_result['chosen_response_uuid']), None)
+                chosen_response = next(
+                    (
+                        r
+                        for r in response_options
+                        if r["uuid"] == vote_result["chosen_response_uuid"]
+                    ),
+                    None,
+                )
                 if chosen_response:
-                    personality = chosen_response['personality']
-                    voter_name = vote_result['voter_name']
+                    personality = chosen_response["personality"]
+                    voter_name = vote_result["voter_name"]
 
                     # Add to simple vote tracking (for backward compatibility)
                     if personality not in votes:
@@ -215,24 +242,27 @@ Provide your advice based on your unique perspective and expertise.
                     votes[personality].append(voter_name)
 
                     # Add to detailed vote tracking
-                    detailed_votes.append({
-                        'vote_uuid': vote_result['vote_uuid'],
-                        'voter': voter_name,
-                        'chosen_response_personality': personality,
-                        'chosen_response_uuid': vote_result['chosen_response_uuid'],
-                        'reasoning': vote_result['reasoning']
-                    })
+                    detailed_votes.append(
+                        {
+                            "vote_uuid": vote_result["vote_uuid"],
+                            "voter": voter_name,
+                            "chosen_response_personality": personality,
+                            "chosen_response_uuid": vote_result["chosen_response_uuid"],
+                            "reasoning": vote_result["reasoning"],
+                        }
+                    )
 
-        self.std_logger.info("Voting completed. Results: %s",
-                           {k: len(v) for k, v in votes.items()})
+        self.std_logger.info("Voting completed. Results: %s", {k: len(v) for k, v in votes.items()})
 
         return votes, detailed_votes
 
-    async def _conduct_analyzed_vote(self, voter: 'CouncilMember', response_options: List[Dict[str, Any]], user_prompt: str) -> Dict[str, str]:
+    async def _conduct_analyzed_vote(
+        self, voter: "CouncilMember", response_options: List[Dict[str, Any]], user_prompt: str
+    ) -> Dict[str, str]:
         """Have a council member analyze all responses and vote for the best one."""
         try:
             # Build blind voting prompt for this council member
-            base_prompt = self.config.get('universal_council_prompt', '')
+            base_prompt = self.config.get("universal_council_prompt", "")
             user_info = self._get_user_context()
 
             voting_prompt = f"""
@@ -257,7 +287,7 @@ Here are the responses to evaluate:
 
             # Add all response options (BLIND - no personality names)
             for i, response in enumerate(response_options, 1):
-                content = response['response']
+                content = response["response"]
 
                 voting_prompt += f"""
 Option {i}:
@@ -279,8 +309,8 @@ Your reasoning will be logged for transparency and audit purposes.
             response = await self.client.chat.completions.create(
                 model=voter.model,
                 messages=[{"role": "user", "content": voting_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=500
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=500,
             )
 
             vote_response = response.choices[0].message.content.strip()
@@ -288,40 +318,50 @@ Your reasoning will be logged for transparency and audit purposes.
 
             # Parse the voter's choice and create structured result
             vote_uuid = str(uuid.uuid4())
-            voter_name = voter.personality.split(' - ')[0] if ' - ' in voter.personality else voter.personality[:20]
+            voter_name = (
+                voter.personality.split(" - ")[0]
+                if " - " in voter.personality
+                else voter.personality[:20]
+            )
 
             try:
                 # Split on first dash to separate choice from reasoning
-                parts = vote_response.split('-', 1)
+                parts = vote_response.split("-", 1)
                 choice_num = int(parts[0].strip())
                 reasoning = parts[1].strip() if len(parts) > 1 else "No reasoning provided"
 
                 if 1 <= choice_num <= len(response_options):
                     chosen_response = response_options[choice_num - 1]
                     return {
-                        'vote_uuid': vote_uuid,
-                        'voter_name': voter_name,
-                        'chosen_response_uuid': chosen_response['uuid'],
-                        'reasoning': reasoning
+                        "vote_uuid": vote_uuid,
+                        "voter_name": voter_name,
+                        "chosen_response_uuid": chosen_response["uuid"],
+                        "reasoning": reasoning,
                     }
                 else:
                     # Fallback: choose first response
-                    self.std_logger.warning("Invalid vote choice from %s, defaulting to first option", voter.personality[:30])
+                    self.std_logger.warning(
+                        "Invalid vote choice from %s, defaulting to first option",
+                        voter.personality[:30],
+                    )
                     return {
-                        'vote_uuid': vote_uuid,
-                        'voter_name': voter_name,
-                        'chosen_response_uuid': response_options[0]['uuid'],
-                        'reasoning': f"Fallback choice due to invalid selection: {reasoning}"
+                        "vote_uuid": vote_uuid,
+                        "voter_name": voter_name,
+                        "chosen_response_uuid": response_options[0]["uuid"],
+                        "reasoning": f"Fallback choice due to invalid selection: {reasoning}",
                     }
 
             except (ValueError, IndexError):
                 # Fallback: choose first response
-                self.std_logger.warning("Could not parse vote from %s, defaulting to first option", voter.personality[:30])
+                self.std_logger.warning(
+                    "Could not parse vote from %s, defaulting to first option",
+                    voter.personality[:30],
+                )
                 return {
-                    'vote_uuid': vote_uuid,
-                    'voter_name': voter_name,
-                    'chosen_response_uuid': response_options[0]['uuid'],
-                    'reasoning': f"Fallback choice due to parse error: {vote_response}"
+                    "vote_uuid": vote_uuid,
+                    "voter_name": voter_name,
+                    "chosen_response_uuid": response_options[0]["uuid"],
+                    "reasoning": f"Fallback choice due to parse error: {vote_response}",
                 }
 
         except Exception as e:
@@ -342,15 +382,16 @@ Your reasoning will be logged for transparency and audit purposes.
 
         return tied_responses > 1
 
-    async def _prime_minister_tiebreaker(self, responses: List[Dict[str, Any]], votes: Dict[str, List[str]], original_prompt: str) -> str:
+    async def _prime_minister_tiebreaker(
+        self, responses: List[Dict[str, Any]], votes: Dict[str, List[str]], original_prompt: str
+    ) -> str:
         """Prime Minister casts the deciding vote in case of a tie."""
         self.std_logger.info("Tie detected - Prime Minister casting deciding vote")
 
         # Get tied responses (those with the maximum vote count)
         max_votes = max(len(voters) for voters in votes.values())
         tied_responses = [
-            resp for resp in responses
-            if len(votes.get(resp['personality'], [])) == max_votes
+            resp for resp in responses if len(votes.get(resp["personality"], [])) == max_votes
         ]
 
         # Build prompt for Prime Minister to choose between tied responses
@@ -365,8 +406,8 @@ The following responses are tied with {max_votes} vote(s) each:
 """
 
         for i, response in enumerate(tied_responses, 1):
-            personality = response['personality']
-            voters = ', '.join(votes.get(personality, []))
+            personality = response["personality"]
+            voters = ", ".join(votes.get(personality, []))
 
             tie_prompt += f"""
 Option {i} - {personality}:
@@ -385,10 +426,10 @@ Example: "2 - I choose this response because..."
 
         try:
             response = await self.client.chat.completions.create(
-                model=self.config.get('model', 'gpt-4'),
+                model=self.config.get("model", "gpt-4"),
                 messages=[{"role": "user", "content": tie_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=500
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=500,
             )
 
             pm_choice = response.choices[0].message.content.strip()
@@ -396,10 +437,10 @@ Example: "2 - I choose this response because..."
 
             # Parse the Prime Minister's choice
             try:
-                choice_num = int(pm_choice.split('-')[0].strip())
+                choice_num = int(pm_choice.split("-")[0].strip())
                 if 1 <= choice_num <= len(tied_responses):
                     chosen_response = tied_responses[choice_num - 1]
-                    chosen_personality = chosen_response['personality']
+                    chosen_personality = chosen_response["personality"]
 
                     # Add Prime Minister's deciding vote
                     if chosen_personality not in votes:
@@ -409,24 +450,26 @@ Example: "2 - I choose this response because..."
                     return chosen_personality
                 else:
                     # Fallback: choose first tied response
-                    chosen_personality = tied_responses[0]['personality']
+                    chosen_personality = tied_responses[0]["personality"]
                     votes[chosen_personality].append("Prime Minister (tie-breaker - fallback)")
                     return chosen_personality
 
             except (ValueError, IndexError):
                 # Fallback: choose first tied response
-                chosen_personality = tied_responses[0]['personality']
+                chosen_personality = tied_responses[0]["personality"]
                 votes[chosen_personality].append("Prime Minister (tie-breaker - fallback)")
                 return chosen_personality
 
         except Exception as e:
             self.std_logger.error("Error in Prime Minister tie-breaker: %s", str(e))
             # Fallback: choose first tied response
-            chosen_personality = tied_responses[0]['personality']
+            chosen_personality = tied_responses[0]["personality"]
             votes[chosen_personality].append("Prime Minister (tie-breaker - error fallback)")
             return chosen_personality
 
-    async def prime_minister_decision(self, responses: List[Dict[str, Any]], votes: Dict[str, List[str]], original_prompt: str) -> str:
+    async def prime_minister_decision(
+        self, responses: List[Dict[str, Any]], votes: Dict[str, List[str]], original_prompt: str
+    ) -> str:
         """Prime Minister makes the final decision and presents it."""
         self.std_logger.info("Prime Minister making final decision")
 
@@ -443,9 +486,9 @@ Council responses and voting results:
 
         # Add each response with vote counts
         for response in responses:
-            personality = response['personality']
+            personality = response["personality"]
             vote_count = len(votes.get(personality, []))
-            voters = ', '.join(votes.get(personality, []))
+            voters = ", ".join(votes.get(personality, []))
 
             pm_prompt += f"""
 Response from {personality}:
@@ -461,10 +504,10 @@ Based on the council's advice and the voting results, provide your final decisio
 
         try:
             response = await self.client.chat.completions.create(
-                model=self.config.get('model', 'gpt-4'),
+                model=self.config.get("model", "gpt-4"),
                 messages=[{"role": "user", "content": pm_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=1500
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=1500,
             )
 
             final_decision = response.choices[0].message.content
@@ -475,7 +518,9 @@ Based on the council's advice and the voting results, provide your final decisio
             self.std_logger.error("Error getting Prime Minister decision: %s", str(e))
             return f"Error: The Prime Minister was unable to make a decision. ({str(e)})"
 
-    async def conduct_opinion_rounds(self, initial_responses: List[Dict[str, Any]], user_prompt: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    async def conduct_opinion_rounds(
+        self, initial_responses: List[Dict[str, Any]], user_prompt: str
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
         Conduct two rounds of opinions in advisor mode.
 
@@ -512,37 +557,42 @@ Be constructive and specific in your feedback.
                 api_response = await self.client.chat.completions.create(
                     model=advisor.model,
                     messages=[{"role": "user", "content": opinion_prompt}],
-                    temperature=self.config.get('temperature', 0.7),
-                    max_tokens=800
+                    temperature=self.config.get("temperature", 0.7),
+                    max_tokens=800,
                 )
 
                 opinion_content = api_response.choices[0].message.content
                 opinion_uuid = str(uuid.uuid4())
 
                 opinion = {
-                    'uuid': opinion_uuid,
-                    'opinion_giver': advisor.personality,
-                    'opinion_giver_model': advisor.model,
-                    'target_response_uuid': response['uuid'],
-                    'target_advisor': response['personality'],
-                    'opinion': opinion_content,
-                    'has_error': False
+                    "uuid": opinion_uuid,
+                    "opinion_giver": advisor.personality,
+                    "opinion_giver_model": advisor.model,
+                    "target_response_uuid": response["uuid"],
+                    "target_advisor": response["personality"],
+                    "opinion": opinion_content,
+                    "has_error": False,
                 }
 
-                self.std_logger.info("Opinion collected from %s on %s's response",
-                                   advisor.personality, response['personality'])
+                self.std_logger.info(
+                    "Opinion collected from %s on %s's response",
+                    advisor.personality,
+                    response["personality"],
+                )
                 return opinion
 
             except Exception as e:
-                self.std_logger.error("Error getting opinion from %s: %s", advisor.personality, str(e))
+                self.std_logger.error(
+                    "Error getting opinion from %s: %s", advisor.personality, str(e)
+                )
                 return {
-                    'uuid': str(uuid.uuid4()),
-                    'opinion_giver': advisor.personality,
-                    'opinion_giver_model': advisor.model,
-                    'target_response_uuid': response['uuid'],
-                    'target_advisor': response['personality'],
-                    'opinion': f"Error: Unable to provide opinion. ({str(e)})",
-                    'has_error': True
+                    "uuid": str(uuid.uuid4()),
+                    "opinion_giver": advisor.personality,
+                    "opinion_giver_model": advisor.model,
+                    "target_response_uuid": response["uuid"],
+                    "target_advisor": response["personality"],
+                    "opinion": f"Error: Unable to provide opinion. ({str(e)})",
+                    "has_error": True,
                 }
 
         # Collect all opinion tasks for parallel execution
@@ -552,7 +602,7 @@ Be constructive and specific in your feedback.
                 continue
             # Each advisor gives opinions on all initial responses (except their own)
             for response in initial_responses:
-                if response['personality'] == advisor.personality:
+                if response["personality"] == advisor.personality:
                     continue  # Skip own response
                 opinion_tasks.append(get_opinion(advisor, response))
 
@@ -567,7 +617,7 @@ Be constructive and specific in your feedback.
             # Find the original advisor
             original_advisor = None
             for advisor in self.council:
-                if advisor.personality == original_response['personality']:
+                if advisor.personality == original_response["personality"]:
                     original_advisor = advisor
                     break
 
@@ -609,37 +659,42 @@ Provide a refined perspective that takes the opinions into account.
                 api_response = await self.client.chat.completions.create(
                     model=original_advisor.model,
                     messages=[{"role": "user", "content": response_prompt}],
-                    temperature=self.config.get('temperature', 0.7),
-                    max_tokens=1000
+                    temperature=self.config.get("temperature", 0.7),
+                    max_tokens=1000,
                 )
 
                 response_content = api_response.choices[0].message.content
                 response_uuid = str(uuid.uuid4())
 
                 second_round_response = {
-                    'uuid': response_uuid,
-                    'personality': original_advisor.personality,
-                    'model': original_advisor.model,
-                    'original_response_uuid': original_response['uuid'],
-                    'response_to_opinions': response_content,
-                    'opinions_considered': [op['uuid'] for op in opinions_on_response],
-                    'has_error': False
+                    "uuid": response_uuid,
+                    "personality": original_advisor.personality,
+                    "model": original_advisor.model,
+                    "original_response_uuid": original_response["uuid"],
+                    "response_to_opinions": response_content,
+                    "opinions_considered": [op["uuid"] for op in opinions_on_response],
+                    "has_error": False,
                 }
 
-                self.std_logger.info("Second round response collected from %s", original_advisor.personality)
+                self.std_logger.info(
+                    "Second round response collected from %s", original_advisor.personality
+                )
                 return second_round_response
 
             except Exception as e:
-                self.std_logger.error("Error getting second round response from %s: %s",
-                                    original_advisor.personality, str(e))
+                self.std_logger.error(
+                    "Error getting second round response from %s: %s",
+                    original_advisor.personality,
+                    str(e),
+                )
                 return {
-                    'uuid': str(uuid.uuid4()),
-                    'personality': original_advisor.personality,
-                    'model': original_advisor.model,
-                    'original_response_uuid': original_response['uuid'],
-                    'response_to_opinions': f"Error: Unable to respond to opinions. ({str(e)})",
-                    'opinions_considered': [op['uuid'] for op in opinions_on_response],
-                    'has_error': True
+                    "uuid": str(uuid.uuid4()),
+                    "personality": original_advisor.personality,
+                    "model": original_advisor.model,
+                    "original_response_uuid": original_response["uuid"],
+                    "response_to_opinions": f"Error: Unable to respond to opinions. ({str(e)})",
+                    "opinions_considered": [op["uuid"] for op in opinions_on_response],
+                    "has_error": True,
                 }
 
         # Collect all second round tasks for parallel execution
@@ -647,14 +702,17 @@ Provide a refined perspective that takes the opinions into account.
         for original_response in initial_responses:
             # Find all opinions on this response
             opinions_on_response = [
-                op for op in first_round_opinions
-                if op['target_response_uuid'] == original_response['uuid'] and not op['has_error']
+                op
+                for op in first_round_opinions
+                if op["target_response_uuid"] == original_response["uuid"] and not op["has_error"]
             ]
 
             if not opinions_on_response:
                 continue  # No opinions to respond to
 
-            second_round_tasks.append(get_second_round_response(original_response, opinions_on_response))
+            second_round_tasks.append(
+                get_second_round_response(original_response, opinions_on_response)
+            )
 
         # Execute all second round requests in parallel
         second_round_responses = []
@@ -663,17 +721,25 @@ Provide a refined perspective that takes the opinions into account.
             # Filter out None responses (from silent advisors)
             second_round_responses = [r for r in responses if r is not None]
 
-        self.std_logger.info("Two-round opinion process completed: %d opinions, %d responses",
-                           len(first_round_opinions), len(second_round_responses))
+        self.std_logger.info(
+            "Two-round opinion process completed: %d opinions, %d responses",
+            len(first_round_opinions),
+            len(second_round_responses),
+        )
 
         return first_round_opinions, second_round_responses
 
-    async def prime_minister_advisor_synthesis_with_opinions(self, initial_responses: List[Dict[str, Any]],
-                                                     first_round_opinions: List[Dict[str, Any]],
-                                                     second_round_responses: List[Dict[str, Any]],
-                                                     original_prompt: str) -> str:
+    async def prime_minister_advisor_synthesis_with_opinions(
+        self,
+        initial_responses: List[Dict[str, Any]],
+        first_round_opinions: List[Dict[str, Any]],
+        second_round_responses: List[Dict[str, Any]],
+        original_prompt: str,
+    ) -> str:
         """Prime Minister synthesizes advisor responses with two-round opinions."""
-        self.std_logger.info("Prime Minister synthesizing advisor responses with two-round opinions")
+        self.std_logger.info(
+            "Prime Minister synthesizing advisor responses with two-round opinions"
+        )
 
         # Build comprehensive context for Prime Minister synthesis
         pm_prompt = f"""
@@ -687,7 +753,7 @@ ROUND 1 - Initial Council Responses:
 
         # Add initial responses
         for response in initial_responses:
-            if not response.get('has_error', False):
+            if not response.get("has_error", False):
                 pm_prompt += f"""
 {response['personality']}:
 {response['response']}
@@ -701,12 +767,14 @@ ROUND 2 - Peer Opinions on Initial Responses:
 
         # Add first round opinions, grouped by target
         for initial_response in initial_responses:
-            if initial_response.get('has_error', False):
+            if initial_response.get("has_error", False):
                 continue
 
             relevant_opinions = [
-                op for op in first_round_opinions
-                if op['target_response_uuid'] == initial_response['uuid'] and not op.get('has_error', False)
+                op
+                for op in first_round_opinions
+                if op["target_response_uuid"] == initial_response["uuid"]
+                and not op.get("has_error", False)
             ]
 
             if relevant_opinions:
@@ -726,7 +794,7 @@ ROUND 3 - Original Advisors' Responses to Opinions:
 
         # Add second round responses
         for response in second_round_responses:
-            if not response.get('has_error', False):
+            if not response.get("has_error", False):
                 pm_prompt += f"""
 {response['personality']}'s response to colleague opinions:
 {response['response_to_opinions']}
@@ -747,10 +815,10 @@ Provide a final recommendation that represents the best of the collective adviso
 
         try:
             response = await self.client.chat.completions.create(
-                model=self.config.get('model', 'gpt-4'),
+                model=self.config.get("model", "gpt-4"),
                 messages=[{"role": "user", "content": pm_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=2500
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=2500,
             )
 
             final_synthesis = response.choices[0].message.content
@@ -761,7 +829,9 @@ Provide a final recommendation that represents the best of the collective adviso
             self.std_logger.error("Error in Prime Minister advisor synthesis: %s", str(e))
             return f"Error: The Prime Minister was unable to synthesize the advisory discussion. ({str(e)})"
 
-    async def prime_minister_advisor_synthesis(self, responses: List[Dict[str, Any]], original_prompt: str) -> str:
+    async def prime_minister_advisor_synthesis(
+        self, responses: List[Dict[str, Any]], original_prompt: str
+    ) -> str:
         """Prime Minister synthesizes advisor responses directly without voting (legacy single-round mode)."""
         self.std_logger.info("Prime Minister synthesizing advisor responses (single round)")
 
@@ -778,9 +848,9 @@ Council advisor responses:
 
         # Add each advisor response
         for response in responses:
-            if not response.get('has_error', False):
-                personality = response['personality']
-                content = response['response']
+            if not response.get("has_error", False):
+                personality = response["personality"]
+                content = response["response"]
 
                 pm_prompt += f"""
 {personality}:
@@ -795,10 +865,10 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
 
         try:
             response = await self.client.chat.completions.create(
-                model=self.config.get('model', 'gpt-4'),
+                model=self.config.get("model", "gpt-4"),
                 messages=[{"role": "user", "content": pm_prompt}],
-                temperature=self.config.get('temperature', 0.7),
-                max_tokens=2000
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=2000,
             )
 
             final_synthesis = response.choices[0].message.content
@@ -815,16 +885,18 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
         session_uuid = str(uuid.uuid4())
         question_uuid = str(uuid.uuid4())
 
-        self.std_logger.info("Processing new request (session: %s): %s", session_uuid, user_prompt[:100])
+        self.std_logger.info(
+            "Processing new request (session: %s): %s", session_uuid, user_prompt[:100]
+        )
 
         try:
             # Step 1: Gather council responses
             responses = await self.gather_council_responses(user_prompt)
 
             # Check mode to determine next steps
-            mode = self.config.get('mode', 'council')
+            mode = self.config.get("mode", "council")
 
-            if mode == 'advisor':
+            if mode == "advisor":
                 # Advisor mode: Two-round opinion system, then PM synthesis
                 self.std_logger.info("Running in advisor mode with two-round opinions")
                 votes = {}
@@ -832,7 +904,9 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
                 tie_broken = False
 
                 # Conduct two rounds of opinions using async processing
-                first_round_opinions, second_round_responses = await self.conduct_opinion_rounds(responses, user_prompt)
+                first_round_opinions, second_round_responses = await self.conduct_opinion_rounds(
+                    responses, user_prompt
+                )
 
                 # Prime Minister synthesizes with all rounds
                 final_decision = await self.prime_minister_advisor_synthesis_with_opinions(
@@ -848,7 +922,9 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
                 # Step 2.5: Handle tie-breaking if necessary
                 tie_broken = False
                 if self._detect_tie(votes):
-                    tie_winner = await self._prime_minister_tiebreaker(responses, votes, user_prompt)
+                    tie_winner = await self._prime_minister_tiebreaker(
+                        responses, votes, user_prompt
+                    )
                     tie_broken = True
                     self.std_logger.info("Tie broken by Prime Minister in favor of: %s", tie_winner)
 
@@ -859,35 +935,39 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
 
             # Step 4: Log the session
             metadata = {
-                'session_uuid': session_uuid,
-                'question_uuid': question_uuid,
-                'result_uuid': result_uuid,
-                'mode': mode,
-                'total_council_members': len(self.council),
-                'responding_members': len(responses),
-                'voting_members': len([m for m in self.council if m.is_voter]) if mode == 'council' else 0,
-                'total_votes_cast': sum(len(v) for v in votes.values()),
-                'tie_broken_by_pm': tie_broken,
-                'response_uuids': [r['uuid'] for r in responses],
-                'detailed_votes': detailed_votes
+                "session_uuid": session_uuid,
+                "question_uuid": question_uuid,
+                "result_uuid": result_uuid,
+                "mode": mode,
+                "total_council_members": len(self.council),
+                "responding_members": len(responses),
+                "voting_members": (
+                    len([m for m in self.council if m.is_voter]) if mode == "council" else 0
+                ),
+                "total_votes_cast": sum(len(v) for v in votes.values()),
+                "tie_broken_by_pm": tie_broken,
+                "response_uuids": [r["uuid"] for r in responses],
+                "detailed_votes": detailed_votes,
             }
 
             # Add opinion round data for advisor mode
-            if mode == 'advisor':
-                metadata.update({
-                    'opinion_rounds_conducted': 2,
-                    'first_round_opinions_count': len(first_round_opinions),
-                    'second_round_responses_count': len(second_round_responses),
-                    'opinion_uuids': [op['uuid'] for op in first_round_opinions],
-                    'second_round_uuids': [sr['uuid'] for sr in second_round_responses]
-                })
+            if mode == "advisor":
+                metadata.update(
+                    {
+                        "opinion_rounds_conducted": 2,
+                        "first_round_opinions_count": len(first_round_opinions),
+                        "second_round_responses_count": len(second_round_responses),
+                        "opinion_uuids": [op["uuid"] for op in first_round_opinions],
+                        "second_round_uuids": [sr["uuid"] for sr in second_round_responses],
+                    }
+                )
 
             # Pass opinion data to logger for advisor mode
             opinion_data = {}
-            if mode == 'advisor':
+            if mode == "advisor":
                 opinion_data = {
-                    'first_round_opinions': first_round_opinions,
-                    'second_round_responses': second_round_responses
+                    "first_round_opinions": first_round_opinions,
+                    "second_round_responses": second_round_responses,
                 }
 
             self.logger.log_session(
@@ -896,37 +976,37 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
                 votes=votes,
                 final_result=final_decision,
                 metadata=metadata,
-                **opinion_data
+                **opinion_data,
             )
 
             self.std_logger.info("Request processing completed successfully")
 
-            session_data = {
-                'responses': responses,
-                'votes': votes,
-                'metadata': metadata
-            }
+            session_data = {"responses": responses, "votes": votes, "metadata": metadata}
 
             # Add opinion data for advisor mode
-            if mode == 'advisor':
-                session_data.update({
-                    'first_round_opinions': first_round_opinions,
-                    'second_round_responses': second_round_responses
-                })
+            if mode == "advisor":
+                session_data.update(
+                    {
+                        "first_round_opinions": first_round_opinions,
+                        "second_round_responses": second_round_responses,
+                    }
+                )
 
             return final_decision, session_data
 
         except Exception as e:
-            self.std_logger.error("Error processing request (session: %s): %s", session_uuid, str(e))
+            self.std_logger.error(
+                "Error processing request (session: %s): %s", session_uuid, str(e)
+            )
 
             # Log the failed session with error details
             error_metadata = {
-                'session_uuid': session_uuid,
-                'question_uuid': question_uuid,
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'total_council_members': len(self.council),
-                'failed_session': True
+                "session_uuid": session_uuid,
+                "question_uuid": question_uuid,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "total_council_members": len(self.council),
+                "failed_session": True,
             }
 
             # Try to log the error session (if logging fails, just continue)
@@ -936,7 +1016,7 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
                     council_responses=[],
                     votes={},
                     final_result=f"ERROR: {str(e)}",
-                    metadata=error_metadata
+                    metadata=error_metadata,
                 )
             except Exception as log_error:
                 self.std_logger.error("Failed to log error session: %s", str(log_error))
@@ -951,23 +1031,27 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
             else:
                 error_message = f"Error: {str(e)}"
 
-            return error_message, {'error': True, 'error_details': str(e)}
+            return error_message, {"error": True, "error_details": str(e)}
 
     def get_council_summary(self) -> Dict[str, Any]:
         """Get a summary of the current council configuration."""
         return {
-            'total_members': len(self.council),
-            'voters': len([m for m in self.council if m.is_voter]),
-            'silent_members': len([m for m in self.council if m.is_silent]),
-            'members': [
+            "total_members": len(self.council),
+            "voters": len([m for m in self.council if m.is_voter]),
+            "silent_members": len([m for m in self.council if m.is_silent]),
+            "members": [
                 {
-                    'personality': member.personality.split(' - ')[0] if ' - ' in member.personality else member.personality[:30],
-                    'model': member.model,
-                    'voter': member.is_voter,
-                    'silent': member.is_silent
+                    "personality": (
+                        member.personality.split(" - ")[0]
+                        if " - " in member.personality
+                        else member.personality[:30]
+                    ),
+                    "model": member.model,
+                    "voter": member.is_voter,
+                    "silent": member.is_silent,
                 }
                 for member in self.council
-            ]
+            ],
         }
 
     async def process_request_json(self, user_prompt: str) -> Dict[str, Any]:
@@ -987,38 +1071,48 @@ Based on the diverse perspectives and expertise of your advisory council, synthe
 
         # Build the complete JSON response matching the log format
         json_response = {
-            'prompt': user_prompt,
-            'final_result': final_decision,
-            'session_uuid': session_data['metadata']['session_uuid'],
-            'question_uuid': session_data['metadata']['question_uuid'],
-            'result_uuid': session_data['metadata']['result_uuid'],
-            'mode': session_data['metadata']['mode'],
-            'council_responses': session_data['responses'],
-            'votes': session_data['votes'],
-            'detailed_votes': session_data['metadata']['detailed_votes'],
-            'metadata': {
-                'total_council_members': session_data['metadata']['total_council_members'],
-                'responding_members': session_data['metadata']['responding_members'],
-                'voting_members': session_data['metadata']['voting_members'],
-                'total_votes_cast': session_data['metadata']['total_votes_cast'],
-                'tie_broken_by_pm': session_data['metadata']['tie_broken_by_pm'],
-                'response_uuids': session_data['metadata']['response_uuids'],
-                'timestamp': session_data['metadata'].get('timestamp')
-            }
+            "prompt": user_prompt,
+            "final_result": final_decision,
+            "session_uuid": session_data["metadata"]["session_uuid"],
+            "question_uuid": session_data["metadata"]["question_uuid"],
+            "result_uuid": session_data["metadata"]["result_uuid"],
+            "mode": session_data["metadata"]["mode"],
+            "council_responses": session_data["responses"],
+            "votes": session_data["votes"],
+            "detailed_votes": session_data["metadata"]["detailed_votes"],
+            "metadata": {
+                "total_council_members": session_data["metadata"]["total_council_members"],
+                "responding_members": session_data["metadata"]["responding_members"],
+                "voting_members": session_data["metadata"]["voting_members"],
+                "total_votes_cast": session_data["metadata"]["total_votes_cast"],
+                "tie_broken_by_pm": session_data["metadata"]["tie_broken_by_pm"],
+                "response_uuids": session_data["metadata"]["response_uuids"],
+                "timestamp": session_data["metadata"].get("timestamp"),
+            },
         }
 
         # Add opinion data for advisor mode
-        if session_data['metadata']['mode'] == 'advisor':
-            json_response.update({
-                'first_round_opinions': session_data.get('first_round_opinions', []),
-                'second_round_responses': session_data.get('second_round_responses', [])
-            })
-            json_response['metadata'].update({
-                'opinion_rounds_conducted': session_data['metadata'].get('opinion_rounds_conducted', 0),
-                'first_round_opinions_count': session_data['metadata'].get('first_round_opinions_count', 0),
-                'second_round_responses_count': session_data['metadata'].get('second_round_responses_count', 0),
-                'opinion_uuids': session_data['metadata'].get('opinion_uuids', []),
-                'second_round_uuids': session_data['metadata'].get('second_round_uuids', [])
-            })
+        if session_data["metadata"]["mode"] == "advisor":
+            json_response.update(
+                {
+                    "first_round_opinions": session_data.get("first_round_opinions", []),
+                    "second_round_responses": session_data.get("second_round_responses", []),
+                }
+            )
+            json_response["metadata"].update(
+                {
+                    "opinion_rounds_conducted": session_data["metadata"].get(
+                        "opinion_rounds_conducted", 0
+                    ),
+                    "first_round_opinions_count": session_data["metadata"].get(
+                        "first_round_opinions_count", 0
+                    ),
+                    "second_round_responses_count": session_data["metadata"].get(
+                        "second_round_responses_count", 0
+                    ),
+                    "opinion_uuids": session_data["metadata"].get("opinion_uuids", []),
+                    "second_round_uuids": session_data["metadata"].get("second_round_uuids", []),
+                }
+            )
 
         return json_response

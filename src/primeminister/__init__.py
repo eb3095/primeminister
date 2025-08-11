@@ -15,16 +15,14 @@ from .logger import PrimeMinisterLogger
 # Optional imports that require external dependencies
 try:
     from .core import PrimeMinister, CouncilMember
+
     _CORE_AVAILABLE = True
 except ImportError:
     _CORE_AVAILABLE = False
     PrimeMinister = None
     CouncilMember = None
 
-__all__ = [
-    'ConfigManager',
-    'PrimeMinisterLogger'
-]
+__all__ = ["ConfigManager", "PrimeMinisterLogger"]
 
 if _CORE_AVAILABLE:
-    __all__.extend(['PrimeMinister', 'CouncilMember'])
+    __all__.extend(["PrimeMinister", "CouncilMember"])

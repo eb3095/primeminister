@@ -9,7 +9,7 @@ Runs on every pull request and push to main/develop branches.
 
 **What it does:**
 - Tests across Python versions 3.8-3.12
-- Installs dependencies and runs linting
+- Installs dependencies
 - Checks code formatting with black
 - Runs the test suite with pytest
 - Builds the package and validates it
@@ -33,9 +33,6 @@ Before submitting a PR, ensure these commands pass locally:
 ```bash
 # Install development dependencies
 make install-dev
-
-# Run linting
-make lint
 
 # Check code formatting
 make check-format

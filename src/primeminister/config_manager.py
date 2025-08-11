@@ -10,9 +10,9 @@ class ConfigManager:
     """Manages configuration loading and creation for PrimeMinister."""
 
     def __init__(self):
-        self.is_linux = platform.system().lower() == 'linux'
-        self.etc_config_path = Path('/etc/primeminister/config.json')
-        self.module_config_path = Path(__file__).parent / 'config.json'
+        self.is_linux = platform.system().lower() == "linux"
+        self.etc_config_path = Path("/etc/primeminister/config.json")
+        self.module_config_path = Path(__file__).parent / "config.json"
 
     def get_config_path(self) -> Path:
         """Determine which config file to use."""
@@ -52,7 +52,7 @@ class ConfigManager:
         config_path = self.ensure_config_exists()
 
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
             return config
         except (json.JSONDecodeError, FileNotFoundError) as e:
@@ -66,7 +66,7 @@ class ConfigManager:
             # Ensure directory exists
             config_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(config_path, 'w', encoding='utf-8') as f:
+            with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
         except (OSError, PermissionError) as e:
             raise RuntimeError(f"Failed to save configuration to {config_path}: {e}")
@@ -79,7 +79,7 @@ class ConfigManager:
 
         try:
             # Read the embedded default config
-            with open(self.module_config_path, 'r', encoding='utf-8') as f:
+            with open(self.module_config_path, "r", encoding="utf-8") as f:
                 default_config = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             raise RuntimeError(f"Failed to load embedded default configuration: {e}")
@@ -88,5 +88,5 @@ class ConfigManager:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write the config to the target path
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(default_config, f, indent=2, ensure_ascii=False)

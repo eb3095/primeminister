@@ -34,11 +34,11 @@ def print_council_summary(pm: PrimeMinister):
     print(f"   Silent Members: {summary['silent_members']}")
 
     print(f"\n👥 Council Members:")
-    for i, member in enumerate(summary['members'], 1):
+    for i, member in enumerate(summary["members"], 1):
         status_icons = []
-        if member['voter']:
+        if member["voter"]:
             status_icons.append("🗳️")
-        if member['silent']:
+        if member["silent"]:
             status_icons.append("🤫")
 
         status = " ".join(status_icons) if status_icons else "💬"
@@ -49,32 +49,34 @@ def print_council_summary(pm: PrimeMinister):
 def format_response(decision: str, session_data: dict = None):
     """Format the final response for display."""
     # Check if this is an error response
-    is_error = session_data and session_data.get('error', False)
+    is_error = session_data and session_data.get("error", False)
 
     if is_error:
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("❌ ERROR")
-        print("="*80)
+        print("=" * 80)
         print(f"\n{decision}\n")
         return
 
     # Normal successful response
-    mode = session_data.get('metadata', {}).get('mode', 'council') if session_data else 'council'
+    mode = session_data.get("metadata", {}).get("mode", "council") if session_data else "council"
 
-    print("\n" + "="*80)
-    if mode == 'advisor':
+    print("\n" + "=" * 80)
+    if mode == "advisor":
         print("🏛️  PRIME MINISTER'S SYNTHESIS")
     else:
         print("🏛️  PRIME MINISTER'S DECISION")
-    print("="*80)
+    print("=" * 80)
     print(f"\n{decision}\n")
 
     # Only show voting results in council mode
-    if mode == 'council' and session_data and session_data.get('votes'):
+    if mode == "council" and session_data and session_data.get("votes"):
         print("📊 Voting Results:")
-        votes = session_data['votes']
+        votes = session_data["votes"]
         for personality, voters in votes.items():
-            personality_name = personality.split(' - ')[0] if ' - ' in personality else personality[:30]
+            personality_name = (
+                personality.split(" - ")[0] if " - " in personality else personality[:30]
+            )
             voter_names = []
             tie_breaker_vote = False
 
@@ -92,11 +94,11 @@ def format_response(decision: str, session_data: dict = None):
             print(f"   • {personality_name}: {vote_display}")
 
         # Show tie-breaking message if applicable
-        if session_data.get('metadata', {}).get('tie_broken_by_pm', False):
+        if session_data.get("metadata", {}).get("tie_broken_by_pm", False):
             print("   ⚖️ Tie was broken by Prime Minister's deciding vote")
 
         print()
-    elif mode == 'advisor':
+    elif mode == "advisor":
         print("ℹ️  Direct synthesis from advisory council (no voting)")
         print()
 
@@ -120,7 +122,7 @@ async def interactive_mode(mode_override=None, json_output=False):
                 if not user_input:
                     continue
 
-                if user_input.lower() in ['quit', 'exit', 'q']:
+                if user_input.lower() in ["quit", "exit", "q"]:
                     print("\n👋 Goodbye!")
                     break
 
@@ -175,25 +177,27 @@ def show_config():
 
         print_banner()
         print(f"📁 Configuration file: {config_path}")
-        print(f"🔑 API Key configured: {'Yes' if config.get('openai_key') and config['openai_key'] != 'your-openai-api-key-here' else 'No'}")
+        print(
+            f"🔑 API Key configured: {'Yes' if config.get('openai_key') and config['openai_key'] != 'your-openai-api-key-here' else 'No'}"
+        )
         print(f"🌐 API URL: {config.get('api_url', 'Not set')}")
         print(f"🤖 Model: {config.get('model', 'Not set')}")
         print(f"🌡️  Temperature: {config.get('temperature', 'Not set')}")
 
-        council = config.get('council', [])
+        council = config.get("council", [])
         print(f"\n👥 Council Members: {len(council)}")
 
         for i, member in enumerate(council, 1):
-            personality = member.get('personality', 'Unknown')
-            name = personality.split(' - ')[0] if ' - ' in personality else personality[:30]
+            personality = member.get("personality", "Unknown")
+            name = personality.split(" - ")[0] if " - " in personality else personality[:30]
             print(f"   {i}. {name}")
             print(f"      Model: {member.get('model', 'Not set')}")
             print(f"      Voter: {'Yes' if member.get('voter', True) else 'No'}")
             print(f"      Silent: {'Yes' if member.get('silent', False) else 'No'}")
 
-        user_config = config.get('user', {})
-        attributes = user_config.get('attributes', [])
-        goal = user_config.get('goal', 'Not set')
+        user_config = config.get("user", {})
+        attributes = user_config.get("attributes", [])
+        goal = user_config.get("goal", "Not set")
 
         print(f"\n👤 User Profile:")
         print(f"   Attributes: {', '.join(attributes) if attributes else 'None set'}")
@@ -220,16 +224,18 @@ def show_history(limit: int = 10):
             return
 
         for i, session in enumerate(reversed(history[-limit:]), 1):
-            timestamp = session.get('timestamp', 'Unknown time')
-            prompt = session.get('prompt', 'Unknown prompt')
+            timestamp = session.get("timestamp", "Unknown time")
+            prompt = session.get("prompt", "Unknown prompt")
 
             print(f"{i}. {timestamp}")
             print(f"   Question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
-            votes = session.get('votes', {})
+            votes = session.get("votes", {})
             if votes:
                 winner = max(votes.items(), key=lambda x: len(x[1]))
-                print(f"   Winner: {winner[0].split(' - ')[0] if ' - ' in winner[0] else winner[0][:30]} ({len(winner[1])} votes)")
+                print(
+                    f"   Winner: {winner[0].split(' - ')[0] if ' - ' in winner[0] else winner[0][:30]} ({len(winner[1])} votes)"
+                )
 
             print()
 
@@ -252,47 +258,39 @@ Examples:
   primeminister --mode advisor --json "Q?"    # Advisor mode with JSON output
   primeminister --config                 # Show configuration
   primeminister --history                # Show recent sessions
-        """
+        """,
     )
 
     parser.add_argument(
-        'question',
-        nargs='?',
-        help='Question or problem to ask the council (if not provided, enters interactive mode)'
+        "question",
+        nargs="?",
+        help="Question or problem to ask the council (if not provided, enters interactive mode)",
     )
 
-    parser.add_argument(
-        '--config',
-        action='store_true',
-        help='Show current configuration and exit'
-    )
+    parser.add_argument("--config", action="store_true", help="Show current configuration and exit")
 
     parser.add_argument(
-        '--history',
+        "--history",
         type=int,
-        nargs='?',
+        nargs="?",
         const=10,
-        metavar='N',
-        help='Show last N sessions (default: 10)'
+        metavar="N",
+        help="Show last N sessions (default: 10)",
     )
 
     parser.add_argument(
-        '--mode',
-        choices=['council', 'advisor'],
-        help='Override decision-making mode: council (voting) or advisor (direct synthesis)'
+        "--mode",
+        choices=["council", "advisor"],
+        help="Override decision-making mode: council (voting) or advisor (direct synthesis)",
     )
 
     parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output response in JSON format (same structure as logs)'
+        "--json",
+        action="store_true",
+        help="Output response in JSON format (same structure as logs)",
     )
 
-    parser.add_argument(
-        '--version',
-        action='version',
-        version='PrimeMinister 1.0.0'
-    )
+    parser.add_argument("--version", action="version", version="PrimeMinister 1.0.0")
 
     args = parser.parse_args()
 
@@ -308,11 +306,13 @@ Examples:
     # Handle question modes
     if args.question:
         # Single question mode
-        asyncio.run(single_question_mode(args.question, mode_override=args.mode, json_output=args.json))
+        asyncio.run(
+            single_question_mode(args.question, mode_override=args.mode, json_output=args.json)
+        )
     else:
         # Interactive mode
         asyncio.run(interactive_mode(mode_override=args.mode, json_output=args.json))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

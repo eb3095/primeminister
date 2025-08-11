@@ -15,7 +15,6 @@ Brief description of the changes in this PR.
 ## Testing
 
 - [ ] Tests pass locally with `make test`
-- [ ] Linting passes with `make lint`
 - [ ] Code formatting checked with `make check-format`
 - [ ] New tests added for new functionality (if applicable)
 

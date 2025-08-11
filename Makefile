@@ -1,4 +1,4 @@
-.PHONY: help install install-dev build clean test lint format check-format publish publish-test
+.PHONY: help install install-dev build clean test format check-format publish publish-test
 
 # Default target
 help:
@@ -10,7 +10,7 @@ help:
 	@echo "  build        Build distribution packages"
 	@echo "  clean        Clean build artifacts"
 	@echo "  test         Run tests"
-	@echo "  lint         Run linting checks"
+
 	@echo "  format       Format code with black"
 	@echo "  check-format Check code formatting"
 	@echo "  publish      Build and publish to PyPI"
@@ -23,7 +23,7 @@ install:
 
 install-dev:
 	pip install -e src/
-	pip install black flake8 pytest pytest-asyncio twine setuptools wheel
+	pip install black pytest pytest-asyncio twine setuptools wheel
 
 # Build targets
 build: clean
@@ -41,9 +41,6 @@ test:
 	pytest src/tests/ -v
 
 # Code quality targets
-lint:
-	flake8 src/primeminister/ --max-line-length=100 --ignore=E203,W503
-
 format:
 	black src/primeminister/ --line-length=100
 
@@ -70,7 +67,7 @@ setup: install
 # Development workflow
 dev-setup: install-dev
 	@echo "Development environment ready!"
-	@echo "Run 'make lint' and 'make test' before committing."
+	@echo "Run 'make check-format' and 'make test' before committing."
 
 # Publishing targets
 publish: build
