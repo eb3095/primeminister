@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import platform
 from datetime import datetime
 from pathlib import Path
@@ -10,23 +11,33 @@ class PrimeMinisterLogger:
     """JSON-based logger with monthly rotation for PrimeMinister sessions."""
 
     def __init__(self):
-        self.is_linux = platform.system().lower() == "linux"
+        self.system = platform.system().lower()
         self.setup_logging_directory()
 
     def setup_logging_directory(self) -> None:
-        """Setup logging directory based on platform."""
-        if self.is_linux:
-            self.log_dir = Path("/var/log/primeminister")
-        else:
-            self.log_dir = Path("./logs")
+        """Setup logging directory based on platform and permissions."""
+        # Only use system logs if running as root on Linux
+        if (self.system == "linux" and
+            os.geteuid() == 0):
+            system_log_dir = Path("/var/log/primeminister")
+            try:
+                system_log_dir.mkdir(parents=True, exist_ok=True)
+                self.log_dir = system_log_dir
+                return
+            except (PermissionError, OSError):
+                # Fall back to user directory
+                pass
 
-        # Create directory if it doesn't exist
-        try:
-            self.log_dir.mkdir(parents=True, exist_ok=True)
-        except PermissionError:
-            # Fallback to local logs directory if we can't write to /var/log
-            self.log_dir = Path("./logs")
-            self.log_dir.mkdir(parents=True, exist_ok=True)
+        # Use user-specific log directory
+        if self.system == "windows":
+            # Windows: My Documents/primeminister/logs
+            self.log_dir = Path.home() / "Documents" / "primeminister" / "logs"
+        else:
+            # Linux/macOS: ~/primeminister/logs
+            self.log_dir = Path.home() / "primeminister" / "logs"
+
+        # Create user log directory
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
     def get_current_log_file(self) -> Path:
         """Get the current month's log file path."""
