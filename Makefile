@@ -27,7 +27,7 @@ install-dev:
 
 # Build targets
 build: clean
-	cd src && python3 setup.py sdist bdist_wheel
+	cd src && python -m build
 
 clean:
 	rm -rf src/build/
