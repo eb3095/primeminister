@@ -20,7 +20,6 @@ Runs on every pull request and push to main/develop branches.
 Runs on pull requests, pushes, and weekly.
 
 **What it does:**
-- Scans dependencies for known vulnerabilities with `safety`
 - Runs static security analysis with `bandit`
 - Uploads security reports as artifacts
 
