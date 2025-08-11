@@ -33,22 +33,29 @@ PrimeMinister creates a "council" of AI advisors, each with distinct personaliti
 - 📝 **Session Logging** - JSON-formatted logs with monthly rotation
 - 🔌 **JSON API** - Programmatic access with structured responses
 - ⚙️ **Flexible Configuration** - Customizable council members and personalities
-- 🐧 **Cross-Platform** - Works on Linux, macOS, and Windows
+- 🐧 **Cross-Platform** - Works on Linux, macOS, and Windows with platform-appropriate file locations
 - 📋 **Interactive & Batch Modes** - Use interactively or with single commands
 
 ## Installation
 
+### From PyPI (Recommended)
+```bash
+pip install primeminister
+```
+
+### From Source
 ```bash
 # Clone the repository
 git clone https://github.com/eb3095/primeminister.git
 cd primeminister
 
-# Install the package
+# Install in development mode
 pip install -e src/
-
-# Or install from PyPI (when published)
-pip install primeminister
 ```
+
+### Requirements
+- Python 3.8+
+- OpenAI API key
 
 ## Quick Start
 
@@ -199,8 +206,23 @@ async def ask_question():
 
 ### Configuration Locations
 
-- **Linux**: `/etc/primeminister/config.json` (with fallback to module path)
-- **Other OS**: `<module_path>/primeminister/config.json`
+Configuration files are stored in user-specific directories by default:
+
+- **Linux/macOS**: `~/.primeminister/config.json`
+- **Windows**: `~/Documents/primeminister/config.json`
+- **Linux (root only)**: `/etc/primeminister/config.json`
+
+The system automatically creates the configuration directory and copies the default configuration on first run.
+
+### Log File Locations
+
+Session logs are stored in user-specific directories with monthly rotation:
+
+- **Linux/macOS**: `~/primeminister/logs/YYYY-MM.json`
+- **Windows**: `~/Documents/primeminister/logs/YYYY-MM.json`
+- **Linux (root only)**: `/var/log/primeminister/YYYY-MM.json`
+
+Each month creates a new log file (e.g., `2024-01.json`) containing all sessions from that month.
 
 ### Council Configuration
 
@@ -390,18 +412,31 @@ This synthesis combines systematic methodology with practical tools and risk awa
 ### Project Structure
 ```
 primeminister/
+├── .github/
+│   ├── workflows/          # GitHub Actions CI/CD
+│   │   ├── test.yml        # Test suite and build
+│   │   └── security.yml    # Security scanning (Bandit)
+│   ├── WORKFLOWS.md        # CI/CD documentation
+│   ├── PULL_REQUEST_TEMPLATE.md # PR template
+│   └── dependabot.yml     # Dependency updates
 ├── src/
 │   ├── primeminister/
 │   │   ├── __init__.py
-│   │   ├── cli.py           # Command-line interface
-│   │   ├── core.py          # Main PrimeMinister class
+│   │   ├── cli.py          # Command-line interface
+│   │   ├── core.py         # Main PrimeMinister class
 │   │   ├── config_manager.py # Configuration management
-│   │   ├── logger.py        # JSON logging system
-│   │   └── config.json      # Default configuration
-│   ├── setup.py
-│   └── requirements.txt
+│   │   ├── logger.py       # JSON logging system
+│   │   └── config.json     # Default configuration
+│   ├── tests/              # Unit tests
+│   ├── pyproject.toml      # Modern Python project configuration
+│   ├── setup.py            # Legacy compatibility
+│   └── requirements.txt    # Dependencies
+├── example_usage.py        # Programmatic usage examples
+├── example_json_usage.py   # JSON API examples
 ├── README.md
-└── Makefile
+├── LICENSE
+├── .gitignore
+└── Makefile               # Development commands
 ```
 
 ### Building and Testing
@@ -409,21 +444,25 @@ primeminister/
 # Install in development mode
 make install-dev
 
-# Run tests (when implemented)
+# Run tests
 make test
 
-# Build distribution
+# Check code formatting
+make check-format
+
+# Format code with Black
+make format
+
+# Build distribution (uses pyproject.toml)
 make build
 
 # Clean build artifacts
 make clean
 ```
 
-## Requirements
+The project uses modern Python packaging with `pyproject.toml` for configuration and `setuptools` for building.
 
-- Python 3.8+
-- OpenAI API key
-- Internet connection for API calls
+
 
 ## License
 
