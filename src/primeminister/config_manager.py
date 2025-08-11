@@ -36,10 +36,12 @@ class ConfigManager:
     def get_config_path(self) -> Path:
         """Determine which config file to use."""
         # Only use system config if we're on Linux and running as root and it exists
-        if (self.system == "linux" and
-            os.geteuid() == 0 and
-            self.system_config_path and
-            self.system_config_path.exists()):
+        if (
+            self.system == "linux"
+            and os.geteuid() == 0
+            and self.system_config_path
+            and self.system_config_path.exists()
+        ):
             return self.system_config_path
 
         # Check if user config exists
@@ -52,9 +54,7 @@ class ConfigManager:
     def ensure_config_exists(self) -> Path:
         """Ensure configuration file exists, creating it if necessary."""
         # Only try system config if running as root on Linux
-        if (self.system == "linux" and
-            os.geteuid() == 0 and
-            self.system_config_path):
+        if self.system == "linux" and os.geteuid() == 0 and self.system_config_path:
             try:
                 if not self.system_config_path.exists():
                     self.system_config_path.parent.mkdir(parents=True, exist_ok=True)
